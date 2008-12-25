@@ -1,8 +1,8 @@
 ---
 layout: default
-title: Topical Post
+title: Category Post
 ---
 
 h1. {{ page.title }}
 
-This post has a topic.
+This post has a category.
