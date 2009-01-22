@@ -88,7 +88,8 @@ module Jekyll
     # Copy all regular files from <source> to <dest>/ ignoring
     # any files/directories that are hidden or backup files (start
     # with "." or end with "~") or contain site content (start with "_")
-    # unless they are "_posts" directories
+    # unless they are "_posts" directories or web server files such as
+    # '.htaccess'
     #   The +dir+ String is a relative path used to call this method
     #            recursively as it descends through directories
     #
@@ -98,7 +99,7 @@ module Jekyll
       entries = Dir.entries(base)
       entries = entries.reject { |e| e[-1..-1] == '~' }
       entries = entries.reject do |e|
-        (e != '_posts') and ['.', '_'].include?(e[0..0])
+        (e != '_posts') and ['.', '_'].include?(e[0..0]) unless ['.htaccess'].include?(e)
       end
 
       # we need to make sure to process _posts *first* otherwise they 
@@ -114,7 +115,7 @@ module Jekyll
           transform_pages(File.join(dir, f))
         else
           first3 = File.open(File.join(self.source, dir, f)) { |fd| fd.read(3) }
-          
+
           if first3 == "---"
             # file appears to have a YAML header so process it as a page
             page = Page.new(self.source, dir, f)
@@ -128,21 +129,31 @@ module Jekyll
         end
       end
     end
-    
+
+    # Constructs a hash map of Posts indexed by the specified Post attribute
+    #
+    # Returns {post_attr => [<Post>]}
+    def post_attr_hash(post_attr)
+      # Build a hash map based on the specified post attribute ( post attr => array of posts )
+      # then sort each array in reverse order
+      hash = Hash.new { |hash, key| hash[key] = Array.new }
+      self.posts.each { |p| p.send(post_attr.to_sym).each { |t| hash[t] << p } }
+      hash.values.map { |sortme| sortme.sort! { |a, b| b <=> a} }
+      return hash
+    end
+
     # The Hash payload containing site-wide data
     #
-    # Returns {"site" => {"time" => <Time>, "posts" => [<Post>]}}
+    # Returns {"site" => {"time" => <Time>,
+    #                     "posts" => [<Post>],
+    #                     "categories" => [<Post>],
+    #                     "topics" => [<Post>] }}
     def site_payload
-      # Build the category hash map of category ( names => arrays of posts )
-      # then sort each array in reverse order
-      categories = Hash.new { |hash, key| hash[key] = Array.new }
-      self.posts.each { |p| p.categories.each { |c| categories[c] << p } }
-      categories.values.map { |cats| cats.sort! { |a, b| b <=> a} }
-      
       {"site" => {
         "time" => Time.now, 
         "posts" => self.posts.sort { |a,b| b <=> a },
-        "categories" => categories
+        "categories" => post_attr_hash('categories'),
+        "topics" => post_attr_hash('topics')
       }}
     end
   end
